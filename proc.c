@@ -6,11 +6,12 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
-
+#include "procinfo.h"
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
 } ptable;
+
 
 static struct proc *initproc;
 
@@ -19,6 +20,29 @@ extern void forkret(void);
 extern void trapret(void);
 
 static void wakeup1(void *chan);
+
+//new fecture: get all processes info
+int
+getprocsinfo(struct procinfo* info)
+{
+  struct proc *p;
+  struct procinfo *in;
+  in = info; 
+  int count = 0;
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if (p->state == EMBRYO || p->state == RUNNABLE || p->state == RUNNING || p->state == SLEEPING)
+	{
+	  in->pid = p->pid;
+	  safestrcpy(in->pname, p->name,16);
+	  count++;
+	  in++;
+	}
+  }
+  release(&ptable.lock);
+  return count;
+}
 
 void
 pinit(void)

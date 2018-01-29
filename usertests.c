@@ -11,9 +11,7 @@
 char buf[8192];
 char name[3];
 char *echoargv[] = { "echo", "ALL", "TESTS", "PASSED", 0 };
-int stdout = 1;
-
-// does chdir() call iput(p->cwd) in a transaction?
+int stdout = 1;// does chdir() call iput(p->cwd) in a transaction?
 void
 iputtest(void)
 {
@@ -1755,7 +1753,7 @@ main(int argc, char *argv[])
     exit();
   }
   close(open("usertests.ran", O_CREATE));
-
+/*
   argptest();
   createdelete();
   linkunlink();
@@ -1798,6 +1796,6 @@ main(int argc, char *argv[])
   uio();
 
   exectest();
-
+*/
   exit();
 }
