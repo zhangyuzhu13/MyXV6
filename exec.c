@@ -28,18 +28,22 @@ exec(char *path, char **argv)
   }
   ilock(ip);
   pgdir = 0;
-
   // Check ELF header
   if(readi(ip, (char*)&elf, 0, sizeof(elf)) != sizeof(elf))
     goto bad;
+ 
   if(elf.magic != ELF_MAGIC)
     goto bad;
-
+  
   if((pgdir = setupkvm()) == 0)
     goto bad;
-
+ 
   // Load program into memory.
-  sz = 0;
+ 
+
+  // make address 0 unaccessible
+  sz = PGSIZE - 1;
+
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
     if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
       goto bad;
@@ -59,7 +63,7 @@ exec(char *path, char **argv)
   iunlockput(ip);
   end_op();
   ip = 0;
-
+  
   // Allocate two pages at the next page boundary.
   // Make the first inaccessible.  Use the second as the user stack.
   sz = PGROUNDUP(sz);
@@ -92,7 +96,7 @@ exec(char *path, char **argv)
     if(*s == '/')
       last = s+1;
   safestrcpy(curproc->name, last, sizeof(curproc->name));
-
+  
   // Commit to the user image.
   oldpgdir = curproc->pgdir;
   curproc->pgdir = pgdir;

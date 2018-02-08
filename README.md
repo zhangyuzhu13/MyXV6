@@ -56,4 +56,13 @@ To run my test file, the command is:
 testgetprocsinfo
 
 
+2. Null pointer dereference
+In xv6, the user program text are loaded into the very first part of address space with virtual address 0. Thus when dereference a null pointer which is point to the 0 virtual address, we will get a return value  which ia actually the program text. To fix this problem, what I have done is to load program code in "next" virtual page and copy the text to the "next" page. Finally we need to set the program entry at the "next" page. 
+
+I have modified the following place:
+
+exec.c: set sz begin at PGSIZE-1 not at 0.
+vm.c: modify the copyuvm function, let the cpoy happen beginning  at PGSIZE not at 0.
+Makefile: change the user program' entry to 0x1000 not 0.
+syscall.c : modify the argptr() function to add a condition if pointer i == 0 which means this is a null pointer, return -1; So the OS can catch the illegal memory access.
 
