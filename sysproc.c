@@ -23,6 +23,25 @@ sys_getprocsinfo(void)
 }
 
 int
+sys_shmem_access(void) 
+{
+  int pgindex;
+  if(argint(0, &pgindex) < 0)
+    return 0;
+  return shmem_access(pgindex);
+}
+
+int 
+sys_shmem_count(void)
+{
+  int pgindex;
+  if(argint(0,&pgindex) < 0)
+    return -1;
+  return shmem_count(pgindex);
+}
+
+
+int
 sys_exit(void)
 {
   exit();

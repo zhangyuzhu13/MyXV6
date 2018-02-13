@@ -62,7 +62,4 @@ In xv6, the user program text are loaded into the very first part of address spa
 I have modified the following place:
 
 exec.c: set sz begin at PGSIZE-1 not at 0.
-vm.c: modify the copyuvm function, let the cpoy happen beginning  at PGSIZE not at 0.
 Makefile: change the user program' entry to 0x1000 not 0.
-syscall.c : modify the argptr() function to add a condition if pointer i == 0 which means this is a null pointer, return -1; So the OS can catch the illegal memory access.
-

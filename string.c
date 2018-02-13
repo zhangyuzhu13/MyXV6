@@ -1,6 +1,6 @@
 #include "types.h"
 #include "x86.h"
-
+// set a value maybe 0 to a part of memory to clear for futher use
 void*
 memset(void *dst, int c, uint n)
 {

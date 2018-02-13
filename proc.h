@@ -31,6 +31,13 @@ struct context {
   uint ebp;
   uint eip;
 };
+// share memory struct
+struct sharemem 
+{
+  char* vaddr;
+  int count; 
+};
+
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
@@ -49,6 +56,7 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  void* share[NSHAREDPG]; //share memory page
 };
 
 // Process memory is laid out contiguously, low addresses first:
