@@ -115,7 +115,8 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-
+  // initial as not a thread
+  p->isthread = 0;
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -230,7 +231,8 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
-
+  // keep fork used in process not thread
+  np->isthread = 0;
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -259,6 +261,61 @@ fork(void)
 
   return pid;
 }
+// create a new thread in a process 
+int clone(void(*fcn)(void*), void *arg, void *stack)
+{  // ? didn't handle the kstack.
+  // in stack esp is the top of stack 
+  // ebp is the down of the stack but in memory address,
+  // stack grows from top to down. 
+  // eip(Instruction Pointer) is the address of compilation instruction which is running now. 
+  int i, pid;
+  struct proc *np;
+  struct proc *curproc = myproc();
+  //cprintf("clone begining");
+  // make sure the stack is page aligned
+  if((uint)stack % PGSIZE != 0) {
+    return -1;
+  }
+  // check if there is enough stack space for a page
+  if(curproc->sz - (uint)stack < PGSIZE) {
+    return -1;
+  }
+  // allocate like in fork()
+  if((np = allocproc()) == 0) {
+    return -1;
+  }
+  uint* ustack = stack + PGSIZE - sizeof(uint*); // address of arg
+    // the part which should be same between thread and process
+  np->pgdir = curproc->pgdir; // page table keep same
+  np->sz = (uint)stack + PGSIZE;
+  *np->tf = *curproc->tf;
+  // return the pid for children thread
+  np->tf->eax = np->pid;
+  np->parent = curproc;
+  for(i = 0; i < NOFILE; i++) {
+    if(curproc->ofile[i]) {
+      np->ofile[i] = filedup(curproc->ofile[i]);
+    }
+  }
+  np->cwd = idup(curproc->cwd);
+  pid = np->pid;
+  np->state = RUNNABLE;
+  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+
+  // the tf need to change
+  np->tf->eip = (uint)fcn; // put the fcn into the start address
+  *ustack = (uint)arg; // the argument address
+  *(ustack - sizeof(uint*)) = 0xffffffff; // the fake return value at the return address
+  // put the stack upper bound and lower bound
+  np->tf->esp = (uint)ustack-sizeof(uint*);
+  np->tf->ebp = (uint)ustack-sizeof(uint*);
+  // set this as a thread
+  np->isthread = 1;
+  // set the stack
+  np->ustack = stack; 
+  //cprintf("clone ends");
+  return pid;
+}
 
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
@@ -272,6 +329,7 @@ exit(void)
 
   if(curproc == initproc)
     panic("init exiting");
+  // deal with thread, change the state and wake up other thread
 
   // Close all open files.
   for(fd = 0; fd < NOFILE; fd++){
@@ -305,6 +363,52 @@ exit(void)
   sched();
   panic("zombie exit");
 }
+// wait for a thread to finish and return
+int join(int pid)
+{
+  struct proc *np;
+  int havekids, mypid;
+  struct proc *parent = myproc();
+  acquire(&ptable.lock);
+  for(;;){
+    havekids = 0;
+    for(np = ptable.proc; np < &ptable.proc[NPROC]; np++){
+      // find the thread we need to wait.
+      if(np->pid != pid)
+        continue;
+      if(np->isthread != 1 || np->parent != parent) {
+        release(&ptable.lock);
+        return -1;
+      }
+      havekids = 1;
+      if(np->state == ZOMBIE){
+        // Found one.
+        mypid = np->pid;
+        kfree(np->kstack);
+        np->kstack = 0;
+        
+        np->pid = 0;
+        np->parent = 0;
+        np->name[0] = 0;
+        np->killed = 0;
+        np->state = UNUSED;
+        // leave the ustack to free in user space
+        //*stack = np->ustack;
+        np->ustack = 0;	
+        release(&ptable.lock);
+        return mypid;
+
+      }
+    }
+     if(!havekids || parent->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(parent, &ptable.lock);  //DOC: wait-sleep
+  }  
+}
 
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
@@ -321,6 +425,9 @@ wait(void)
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->parent != curproc)
+        continue;
+      // make sure this is the last reference to free memory
+      if(p->isthread)
         continue;
       havekids = 1;
       if(p->state == ZOMBIE){
@@ -345,7 +452,7 @@ wait(void)
     }
 
     // No point waiting if we don't have any children.
-    if(!havekids || curproc->killed){
+    if(!havekids || curproc->killed || curproc->isthread){
       release(&ptable.lock);
       return -1;
     }

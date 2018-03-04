@@ -64,7 +64,7 @@ argptr(int n, char **pp, int size)
   if(argint(n, &i) < 0)
     return -1;
   // i == 0 means null pointer
-  if(size < 0 || (uint)i >= curproc->sz || (uint)i+size > curproc->sz || (uint)i == 0)
+  if(size < 0 || (uint)i >= curproc->sz || (uint)i+size > curproc->sz)
     return -1;
   *pp = (char*)i;
   return 0;
@@ -107,6 +107,8 @@ extern int sys_uptime(void);
 extern int sys_getprocsinfo(void);
 extern int sys_shmem_access(void);
 extern int sys_shmem_count(void);
+extern int sys_clone(void);
+extern int sys_join(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -132,7 +134,9 @@ static int (*syscalls[])(void) = {
 [SYS_close]   sys_close,
 [SYS_getprocsinfo] sys_getprocsinfo,
 [SYS_shmem_access] sys_shmem_access,
-[SYS_shmem_count] sys_shmem_count
+[SYS_shmem_count] sys_shmem_count,
+[SYS_clone]    sys_clone,
+[SYS_join]     sys_join,
 };
 
 void

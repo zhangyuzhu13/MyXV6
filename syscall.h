@@ -23,3 +23,5 @@
 #define SYS_getprocsinfo  22
 #define SYS_shmem_access 23
 #define SYS_shmem_count 24
+#define SYS_clone  25
+#define SYS_join   26
