@@ -36,15 +36,14 @@ lock_t lock;
 // our product
 int things = 0;
 int things_made = 0;
-//#define MAX_CONSUME 3000000
-#define MAX_CONSUME 3
+#define MAX_CONSUME 3000000
+//#define MAX_CONSUME 3
 void consumer(void* arg)
 {
     int i;
     int consumed = 0;
     // dumb little busy sleep
     for (i = 0; i < 200; i++);
-    printf(1, "consumer begin\n");
     while (consumed < MAX_CONSUME)
     {
         // not thread safe but give producers time
@@ -62,7 +61,6 @@ void consumer(void* arg)
         #if LOCKS_ON
         lock_release(&lock);
         #endif
-        printf(1, "consume %d\n", consumed);
     }
     printf(1, "consumer %d consumed: %d\n", *(int*)arg, consumed);
     exit();
@@ -70,12 +68,11 @@ void consumer(void* arg)
 
 #define NUM_PROD 3
 #define NUM_CONS 2
-//#define TOTAL_PRODUCTS 10000000
-#define TOTAL_PRODUCTS 10
+#define TOTAL_PRODUCTS 10000000
+//#define TOTAL_PRODUCTS 10
 void producer(void* arg)
 {
     int cont = 1;
-    printf(1, "producer begin\n");
     while (cont)
     {
         #if LOCKS_ON
@@ -94,7 +91,6 @@ void producer(void* arg)
         #if LOCKS_ON
         lock_release(&lock);
         #endif
-        printf(1, "produce %d\n", things);
     }
     
     exit();
