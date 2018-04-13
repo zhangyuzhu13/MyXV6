@@ -13,6 +13,7 @@ struct {
 } ptable;
 
 
+
 static struct proc *initproc;
 
 int nextpid = 1;
