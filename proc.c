@@ -13,6 +13,7 @@ struct {
 } ptable;
 
 
+
 static struct proc *initproc;
 
 int nextpid = 1;
@@ -187,17 +188,30 @@ int
 growproc(int n)
 {
   uint sz;
+  acquire(&ptable.lock);
   struct proc *curproc = myproc();
-
+  struct proc *p;
   sz = curproc->sz;
   if(n > 0){
-    if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
+    if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0){
+      release(&ptable.lock);
       return -1;
+    }
+      
   } else if(n < 0){
-    if((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0)
+    if((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0){
+      release(&ptable.lock);
       return -1;
+    }
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      // modify threads size to be the same with his parent process
+      if(p->pgdir != curproc->pgdir) 
+        continue;
+      p->sz = sz;
+    }  
   }
   curproc->sz = sz;
+  release(&ptable.lock);
   switchuvm(curproc);
   return 0;
 }
@@ -299,7 +313,6 @@ int clone(void(*fcn)(void*), void *arg, void *stack)
   }
   np->cwd = idup(curproc->cwd);
   pid = np->pid;
-  np->state = RUNNABLE;
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
   // the tf need to change
@@ -313,7 +326,10 @@ int clone(void(*fcn)(void*), void *arg, void *stack)
   np->isthread = 1;
   // set the stack
   np->ustack = stack; 
-  //cprintf("clone ends");
+  //need to lock when change the process state
+  acquire(&ptable.lock);
+  np->state = RUNNABLE;
+  release(&ptable.lock);
   return pid;
 }
 
@@ -352,9 +368,16 @@ exit(void)
   // Pass abandoned children to init.
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->parent == curproc){
-      p->parent = initproc;
-      if(p->state == ZOMBIE)
-        wakeup1(initproc);
+      //if it's a thread, just clear the parent information and change the state
+      if(p->pgdir != curproc->pgdir){
+        p->parent = initproc;
+        if(p->state == ZOMBIE)
+          wakeup1(initproc);
+      }
+      else {
+        p->parent = 0;
+        p->state = ZOMBIE;
+      }
     }
   }
 
