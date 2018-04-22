@@ -12,7 +12,7 @@
 int stdout = 1;
 
 void 
-getpinfotest(){
+ps(){
   struct pstat infos;
   struct pstat *in = &infos;
   int procnum = getpinfo(in);
@@ -30,44 +30,17 @@ getpinfotest(){
     }
   }
 }
-
-
 int
 main(int argc, char *argv[])
 {
   printf(1, "testgetpinfo starting\n");
-/*
+  /*
   if(open("testgetprocsinfo.ran", 0) >= 0){
     printf(1, "already ran testgetprocsinfo -- rebuild fs.img\n");
     exit();
   }
   close(open("testgetprocsinfo.ran", O_CREATE));
   */
-  long time = 1 << 30; 
-  long answer = 1;
-  if(fork() == 0)
-  {
-    //setpri(2); 
-    if(fork() == 0){
-      setpri(2);
-      for(int i = 0; i < time; i++)
-        answer++;
-      getpinfotest();
-    } else{
-        //setpri(2);
-        for(int i = 0; i < time; i++)
-          answer--;
-        //getpinfotest();
-        //wait();
-  }
-  } 
-  else{
-    setpri(2);
-    for(int i = 0; i < time; i++)
-      answer++;
-    //getpinfotest();
-    //wait();
-  }
-  printf(1, "answer is %d\n",answer);
+  ps();
   exit();
 }

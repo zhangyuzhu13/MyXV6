@@ -33,7 +33,7 @@ getpinfo(struct pstat* info)
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
   {
-    if (p->state == RUNNING){
+    if (p->state == RUNNING || p->state == RUNNABLE || p->state == SLEEPING){
       info->pids[count] = p->pid;
       info->pri1_rtms[count] = p->pri1_rtm;
       info->pri2_rtms[count] = p->pri2_rtm;
