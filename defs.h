@@ -10,6 +10,7 @@ struct sleeplock;
 struct stat;
 struct superblock;
 struct procinfo;
+struct pstat;
 
 // bio.c
 void            binit(void);
@@ -121,9 +122,11 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
-int 			getprocsinfo(struct procinfo*);
+int             getpinfo(struct pstat*);
 int             clone(void(*)(void*), void*, void*);
 int             join(int);
+int             setpri(int);
+void            updatertm();
 // swtch.S
 void            swtch(struct context**, struct context*);
 

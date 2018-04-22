@@ -1,8 +1,8 @@
 struct stat;
 struct rtcdate;
-struct procinfo;
 struct lock_t;
 struct kthread_t;
+struct pstat;
 // system calls
 int fork(void);
 int exit(void) __attribute__((noreturn));
@@ -25,12 +25,12 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-int getprocsinfo(struct procinfo*);
+int getpinfo(struct pstat*);
 int shmem_access(int);
 int shmem_count(int);
 int clone(void(*fcn)(void*), void *arg, void *stack);
 int join(int pid);
-
+int setpri(int priority);
 // ulib.c
 int stat(char*, struct stat*);
 char* strcpy(char*, char*);
