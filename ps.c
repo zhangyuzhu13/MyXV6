@@ -26,7 +26,7 @@ ps(){
     int index;
     for(index = 0; index < procnum; index++)
     {  	   
-      printf(stdout, "pid:%d, running time in priority 1:%d, running time in priority 2: %d\n", in->pids[index], in->pri1_rtms[index], in->pri2_rtms[index]);
+      printf(stdout, "pid:%d, running time in priority 1:%d, running time in priority 2: %d\n", in->pid[index], in->lticks[index], in->hticks[index]);
     }
   }
 }

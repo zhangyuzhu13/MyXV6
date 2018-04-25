@@ -34,9 +34,9 @@ getpinfo(struct pstat* info)
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
   {
     if (p->state == RUNNING || p->state == RUNNABLE || p->state == SLEEPING){
-      info->pids[count] = p->pid;
-      info->pri1_rtms[count] = p->pri1_rtm;
-      info->pri2_rtms[count] = p->pri2_rtm;
+      info->pid[count] = p->pid;
+      info->lticks[count] = p->pri1_rtm;
+      info->hticks[count] = p->pri2_rtm;
       count++;	
     }
   }
