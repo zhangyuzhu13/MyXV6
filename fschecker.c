@@ -98,6 +98,8 @@ int getinum(uint inum, char *name)
   rinode(inum, &in);
   struct dirent dirs[DPB];
   char buf[BSIZE];
+  if(in.type != T_DIR)
+    return 0;
   // find directory inode and to check the direct directory format
   for(uint j = 0; j < NDIRECT; j++) {
     if(in.addrs[j] == 0)
@@ -149,15 +151,47 @@ int checkdirformat(char *name)
 int checkparent()
 {
   struct dinode in; 
+  uchar buf[BSIZE];
+  struct dirent dirs[DPB];
   // loop all inode to check all directory inode
   for(uint i = 0; i < sb.ninodes; i++){
     rinode(i, &in);
     if(in.type != T_DIR) 
       continue;
-    uint inum = getinum(i, "..");
-    if(inum != i){
-      printf("%d, %d\n", inum, i);
-      return -1;
+    // for each dirent inum, there should be a ".." in it's inode's address's dirent and point back to his parent.
+    for(uint j = 0; j < NDIRECT; j++) {
+      if(in.addrs[j] == 0)
+        continue;
+      rsect(in.addrs[j], buf);
+      memmove(&dirs, buf, sizeof(dirs));
+      for(uint k = 0; k < DPB; k++){
+        uint inum = getinum((uint)dirs[k].inum, "..");
+        if(inum > 0 && inum != i){
+          printf("%d, %d\n", inum, i);
+          return -1;
+        }
+      }
+    }
+    // search the indirect part
+    if(in.addrs[NDIRECT] != 0){
+      uint addrs[NINDIRECT];
+      rsect(in.addrs[NDIRECT], buf);
+      memmove(&addrs, buf, sizeof(addrs));
+      // read each address
+      for(uint j = 0; j < NINDIRECT; j++){
+        if(addrs[j] == 0)
+          continue;
+        rsect(addrs[j], buf);
+        memmove(&dirs, buf, sizeof(dirs));
+        // read each dirent to find the name match
+        for(uint k = 0; k < DPB; k++){
+          uint inum = getinum((uint)dirs[k].inum, "..");
+          if(inum > 0 && inum != i){
+            printf("%d, %d\n", inum, i);
+            return -1;
+          }
+        }
+      }
     }
   }
   return 1;  
@@ -197,8 +231,8 @@ int checkbitmap(uint addresses[])
       if(in.addrs[j] == 0)
         continue;
       addresses[in.addrs[j]] += 1;
-      if(getbit(in.addrs[j]) != 1)
-        return -1;
+      if(getbit(in.addrs[j]) != 1){}
+        //return -1;
     }
     // search the indirect part to find the name
     if(in.addrs[NDIRECT] != 0){
@@ -210,10 +244,13 @@ int checkbitmap(uint addresses[])
         if(addrs[j] == 0)
           continue;
         addresses[addrs[j]] += 1;
-        if(getbit(addrs[j]) != 1)
-          return -1;        
+        if(getbit(addrs[j]) != 1){}
+          //return -1;        
       }
     }
+  }
+  for(int i = 60; i < sb.size; i++){
+    printf("%d, ", addresses[i]);
   }
   return 1;
 }
@@ -266,7 +303,8 @@ int checkinoderef(uint inodes[])
       rsect(in.addrs[j], buf);
       memmove(&dirs, buf, sizeof(dirs));
       for(uint k = 0; k < DPB; k++){
-        if(dirs[k].inum != 0){
+        // count the directory inode which be linked
+        if(dirs[k].inum != 0 && strncmp("..", dirs[k].name, DIRSIZ) != 0 && strncmp(".", dirs[k].name, DIRSIZ) != 0){
           inodes[dirs[k].inum]++;
         }
       }
@@ -284,16 +322,19 @@ int checkinoderef(uint inodes[])
         memmove(&dirs, buf, sizeof(dirs));
         // read each dirent to find the name match
         for(uint k = 0; k < DPB; k++){
-          if(dirs[k].inum != 0){
+          // count the directory inode which be linked
+          if(dirs[k].inum != 0 && strncmp("..", dirs[k].name, DIRSIZ) != 0 && strncmp(".", dirs[k].name, DIRSIZ) != 0){
             inodes[dirs[k].inum]++;
           }
         }
       }
     }
   }
-  for(uint i = 0; i < sb.ninodes; i++){
+  // inum 1 is the root directory so no need to check refernece to root.
+  for(uint i = 2; i < sb.ninodes; i++){
     rinode(i, &in);
     if(in.type != 0 && inodes[i] == 0){
+      printf("%d, %d\n", inodes[i], i);
       return -1;
     }
   }
@@ -332,8 +373,18 @@ int checklinks(uint inodes[])
 }
 
 // check 12: No extra links allowed for directories (each directory only appears in one other directory)
-int checkdirref()
+int checkdirref(uint inodes[])
 {
+  struct dinode in;
+  for(uint i = 0; i < sb.ninodes; i++){
+    rinode(i, &in);
+    if(in.type != T_DIR)
+      continue;
+    if(inodes[i] > 1){
+      printf("%d, %d, %d\n", i, inodes[i], in.nlink);
+      return -1;
+    }
+  }
   return 1;
 }
 int main(int argc, char *argv[]) {
@@ -357,17 +408,7 @@ int main(int argc, char *argv[]) {
   memmove(&sb, buf, sizeof(sb));
   printf("%d, %d, %d, %d, %d, %d, %d\n",sb.size, sb.nblocks, sb.ninodes, sb.nlog, sb.logstart, sb.inodestart, sb.bmapstart); 
   rsect(sb.bmapstart, &buf);
-  /* print bitmap
-  int count = 0;
-  for(int i = 0; i < BSIZE; i++){
-    for(int j = 0;  j < 8; j++){
-      if((buf[i] >> j) % 2 == 1) count++;
-      printf("%d", (buf[i] >> j) % 2);
-    }
-    printf("%d\n", i);
-  }
-  printf("count %d\n", count);
-  */
+  
   if(checkinodetype() == -1) {
     close(fsfd);
     fprintf(stderr, "ERROR: bad inode");
@@ -401,12 +442,12 @@ int main(int argc, char *argv[]) {
     close(fsfd);
     fprintf(stderr, "ERROR: address used by inode but marked free in bitmap.");
     return 1;
-  }/* some problem
+  }
   if(checkblockuse(addresses) == -1){
     close(fsfd);
     fprintf(stderr, "ERROR: bitmap marks block in use but it is not in use");
     return 1;
-  }*/
+  }
   if(checkusetime(addresses) == -1){
     close(fsfd);
     fprintf(stderr, "ERROR: address used more than once");
@@ -431,7 +472,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "ERROR: bad reference count for file");
     return 1;
   }
-  if(checkdirref() == -1){
+  if(checkdirref(inodes) == -1){
     close(fsfd);
     fprintf(stderr, "ERROR: directory appears more than once in file system");
     return 1;
