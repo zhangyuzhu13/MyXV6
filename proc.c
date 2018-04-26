@@ -513,11 +513,11 @@ scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
-  int max_priority = 1;
   for(;;){
     // Enable interrupts on this processor.
     sti();
-    
+    int max_priority = 1;
+
     // Loop over process table looking for the highest priority.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
@@ -543,8 +543,13 @@ scheduler(void)
 
         swtch(&(c->scheduler), p->context);
         switchkvm();
-
+        
+        
         // Process is done running for now.
+        // update the max_priority in case the priority of this process changed 
+        if(p->state != ZOMBIE && p->priority > max_priority){
+          max_priority = p->priority;
+        }
         // It should have changed its p->state before coming back.
         c->proc = 0;
       }
