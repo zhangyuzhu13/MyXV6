@@ -4,7 +4,7 @@
 
 #define ROOTINO 1  // root i-number
 #define BSIZE 512  // block size
-
+#define SUPERBLOCK 1
 // Disk layout:
 // [ boot block | super block | log | inode blocks |
 //                                          free bit map | data blocks]
@@ -54,4 +54,5 @@ struct dirent {
   ushort inum;
   char name[DIRSIZ];
 };
+#define DPB (BSIZE/sizeof(struct dirent))
 
