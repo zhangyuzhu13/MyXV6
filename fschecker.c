@@ -205,7 +205,6 @@ int getbit(uint addr)
   uint index = (addr % BPB) / 8; // bitmap block number
   uint shift = addr % 8; // addr shift bit
   // the bit in bitmap is marked return 1, not mark in bitmap return -1
-  uchar one = 1;
   if((buf[index] >> shift) % 2 == 1){
     return 1;
   }
@@ -231,11 +230,12 @@ int checkbitmap(uint addresses[])
       if(in.addrs[j] == 0)
         continue;
       addresses[in.addrs[j]] += 1;
-      if(getbit(in.addrs[j]) != 1){}
-        //return -1;
+      if(getbit(in.addrs[j]) != 1)//{printf("%d, ", in.addrs[j]);}
+        return -1;
     }
     // search the indirect part to find the name
     if(in.addrs[NDIRECT] != 0){
+      addresses[in.addrs[NDIRECT]] += 1; // the indirect block is also a data block which need to be record.
       uint addrs[NINDIRECT];
       rsect(in.addrs[NDIRECT], buf);
       memmove(&addrs, buf, sizeof(addrs));
@@ -244,13 +244,10 @@ int checkbitmap(uint addresses[])
         if(addrs[j] == 0)
           continue;
         addresses[addrs[j]] += 1;
-        if(getbit(addrs[j]) != 1){}
-          //return -1;        
+        if(getbit(addrs[j]) != 1)//{printf("%d, ", addrs[j]);}
+          return -1;        
       }
     }
-  }
-  for(int i = 60; i < sb.size; i++){
-    printf("%d, ", addresses[i]);
   }
   return 1;
 }
@@ -261,14 +258,14 @@ int checkblockuse(uint addresses[])
   uchar buf[BSIZE];
   // because only one block is bit map, just copy one into buf and change 1 to 0 if checked, to see if there is any 1 left in bitmap, this is eror 7
   rsect(sb.bmapstart, buf);
-  uint start = sb.bmapstart + sb.ninodes + 1;
+  uint start = sb.bmapstart + 1;
   for(uint i = start; i < sb.size; i++){
     uint index = i / 8;
     uint shift = i % 8;
     if((buf[index] >> shift) % 2 == 1){
       if(addresses[i] == 0){
-        //printf("%d\n", i);
-        return -1;
+        printf("%d\n", i);
+        //return -1;
       }
     }
   }
