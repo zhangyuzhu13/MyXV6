@@ -403,7 +403,7 @@ int main(int argc, char *argv[]) {
   // read the superblock into buffer
   rsect(SUPERBLOCK, buf);
   memmove(&sb, buf, sizeof(sb));
-  printf("%d, %d, %d, %d, %d, %d, %d\n",sb.size, sb.nblocks, sb.ninodes, sb.nlog, sb.logstart, sb.inodestart, sb.bmapstart); 
+  printf("sb.size: %d, sb.nblocks: %d, sb.ninodes:%d, sb.nlog: %d, sb.logstart: %d, sb.inodestart: %d, sb.bmapstart: %d\n",sb.size, sb.nblocks, sb.ninodes, sb.nlog, sb.logstart, sb.inodestart, sb.bmapstart); 
   rsect(sb.bmapstart, &buf);
   
   if(checkinodetype() == -1) {
@@ -473,6 +473,7 @@ int main(int argc, char *argv[]) {
     close(fsfd);
     fprintf(stderr, "ERROR: directory appears more than once in file system");
     return 1;
-  } 
+  }
+  printf("This file system is consistent!\n"); 
   return 0;
 }

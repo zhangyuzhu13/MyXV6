@@ -11,12 +11,7 @@
 
 //int stdout = 1;
 
-void createfile(char * name)
-{
-   writefile(name);
-   readfile(name);
-   printf(1, "TEST PASSED\n");
-}
+
 void readfile(char* name){
    int fd;
    int size = 512;
@@ -47,7 +42,7 @@ void writefile(char* name){
    printf(1, "buffer size: %d\n", size);
    printf(1, "file size: %d\n", n * size);
 
-   printf(1, "write checked file\n");
+  
    fd = open(name, O_CREATE | O_CHECKED | O_RDWR);
    
 
@@ -60,10 +55,15 @@ void writefile(char* name){
       printf(1, "r = %d, size = %d\n", r, size);
       
    }
-   printf("finish writeing!!\n");
+   printf(1, "finish writeing %d!!\n", fd);
    r = close(fd);
 }
-
+void createfile(char * name)
+{
+   writefile(name);
+   readfile(name);
+   printf(1, "TEST PASSED\n");
+}
 int main(int argc, char *argv[]){
   
   if(argc != 2){

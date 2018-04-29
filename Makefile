@@ -152,6 +152,9 @@ _forktest: forktest.o $(ULIB)
 mkfs: mkfs.c fs.h
 	gcc -Werror -Wall -o mkfs mkfs.c
 
+fschecker: fschecker.c fs.h 
+	gcc fschecker.c -o fschecker
+
 # Prevent deletion of intermediate files, e.g. cat.o, after first build, so
 # that disk image changes after first build are persistent until clean.  More
 # details:
@@ -182,6 +185,7 @@ UPROGS=\
 
 fs.img: mkfs $(UPROGS)
 	./mkfs fs.img $(UPROGS)
+
 
 -include *.d
 
