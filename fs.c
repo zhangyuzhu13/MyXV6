@@ -484,10 +484,13 @@ uint createcksm(char* data){
 int checkcksm(char* data, uint addr){
   uint currcksm = createcksm(data);
   uint oldcksm = (addr >> 24);
+  cprintf("addr is %d\n", addr);
   if(currcksm == oldcksm)
     return 1;
-  else 
+  else {
+    cprintf("old: %d, new: %d\n", oldcksm, currcksm);
     return -1;
+  }
 }
 //PAGEBREAK!
 // Read data from inode.
@@ -517,26 +520,29 @@ readi(struct inode *ip, char *dst, uint off, uint n)
     //check the checksum if the file type is checksum-based file
     if(ip->type == T_CHECKED){
       int isfind = 0;
-      uint* addr = 0;
+      uint addr = 0;
       for(int i = 0; i < NDIRECT; i++){
+        
         // get the address in th direct part
-        if((ip->addrs[i] & 0x00ffffff) == block){
+        if((ip->addrs[i] & 0x00ffffff)== block){
           isfind = 1;
-          *addr = ip->addrs[i];
+          addr = ip->addrs[i];
+cprintf("%d, %d", ip->addrs[i], block);
           break;
         }
       }
+      
       if(isfind == 0 && ip->addrs[NDIRECT] != 0){ // check the indirect part
         struct buf *b = bread(ip->dev, ip->addrs[NDIRECT]);
         uint *ptr = (uint*)b->data;
         for(int i = 0; i < NINDIRECT; i++){
           if(((*ptr) & 0x00ffffff) == block){
-             *addr = *ptr;
+             addr = *ptr;
           }
         }
         brelse(b); 
       }
-      int currcksm = checkcksm((char*)bp->data, *addr);
+      int currcksm = checkcksm((char*)bp->data, addr);
       if(currcksm < 0)
         return -1;
     }
@@ -578,13 +584,15 @@ writei(struct inode *ip, char *src, uint off, uint n)
       int blockindex = -1;
       // check direct pointer first
       for(int i = 0; i < NDIRECT; i++){
+        cprintf("curr block is %d\n", ip->addrs[i]);
         if((ip->addrs[i] & 0x00ffffff) == block){
           blockindex = i;
           break;
         }  
       }// the block is in a direct pointer
-      if(blockindex > 0){
+      if(blockindex > -1){
         ip->addrs[blockindex] = block + (checksum << 24);
+        cprintf("addrs in write is %d\n", ip->addrs[blockindex]);
       } else { // check the indirect part
         struct buf* b = bread(ip->dev, ip->addrs[NDIRECT]);
         uint * ptr = (uint*)b->data;
