@@ -1,6 +1,6 @@
 # MyXV6 #
 
-### 1.System call -- getprocsinfo ###
+## 1.System call -- getprocsinfo ###
 
 Based on the xv6 System, I implemented a system call named getprocsinfo.
 The function prototype is:
@@ -203,6 +203,110 @@ The test case create three producer and two consumer and use lock to add and del
 
 For test this part, run the xv6 OS then input:
 `testkthreads`
+
+## 5.Scheduling and File Systems
+
+### xv6 scheduler
+
+In this part, I put a new scheduler into xv6. It is called a simple priority-based scheduler . The basic idea is simple: assign each running process a priority, which is an integer number, in this case either 1 (low priority) or 2 (high priority). At any given instance, the scheduler should run processes that have the high priority (2). If there are two or more processes that have the same high priority, the scheduler should round-robin between them. A low-priority (level 1) process does NOT run as long as there are high-priority jobs available to run. 
+
+##### Implementation
+
+Now that there are two priorities in this system and we need to record how long it has run at each priority. I just add three attributes into struct proc: int priority, int pri1_rtm, int pri2_rtm. Then for the schedule() function in proc.c, I first for loop the ptable to find the max priority in ptable. Then for loop the ptable to find the propre process with the max priority. When the process finish, check if the priority improve or not. If improve to a higher level priority, update the max priority.  
+
+The setpri(int num) is used to set the priority for current process. There is nothing special for this function, just remind check input and add lock for ptable when change the process priority.
+
+The getpinfo(struct pstat) function is used to get the information of all processes which are still alive. The information contains pid, how long it has run at each priority (measured in clock ticks). This part need to add a new system call getpinfo. The step for add a system call has been record before. 
+
+In order to measure running time in clock ticks, I update the running time for current process in the clock trap which is in trap.c. It would be called every tick so the running time would be record every tick. 
+
+Finally, I write a testscheduler.c file which is used to test this part and write a ps.c using getpinfo() to impelement ths ps commond. 
+
+For call test case, run xv6 then use commond ``` testscheduler ```
+
+### xv6 File system checker
+
+In this part, I would implement a file system consistency checker based on xv6 file system. There are many details need to check. I just list at there:
+
+1. Each inode is either unallocated or one of the valid types (T_FILE, T_DIR, T_DEV). ERROR: bad inode.
+2. For in-use inodes, each address that is used by inode is valid (points to a valid datablock address within the image). Note: must check indirect blocks too, when they are in use. ERROR: bad address in inode. 
+3. Root directory exists, and it is inode number 1. ERROR MESSAGE: root directory does not exist.
+4. Each directory contains . and .. entries. ERROR: directory not properly formatted.
+5. Each .. entry in directory refers to the proper parent inode, and parent inode points back to it. ERROR: parent directory mismatch.
+6. For in-use inodes, each address in use is also marked in use in the bitmap. ERROR: address used by inode but marked free in bitmap.7. For blocks marked in-use in bitmap, actually is in-use in an inode or indirect block somewhere. ERROR: bitmap marks block in use but it is not in use.
+8. For in-use inodes, any address in use is only used once. ERROR: address used more than once.
+9. For inodes marked used in inode table, must be referred to in at least one directory. ERROR: inode marked use but not found in a directory.
+10. For inode numbers referred to in a valid directory, actually marked in use in inode table. ERROR: inode referred to in directory but marked free.
+11. Reference counts (number of links) for regular files match the number of times file is referred to in directories (i.e., hard links work correctly). ERROR: bad reference count for file.
+12. No extra links allowed for directories (each directory only appears in one other directory). ERROR: directory appears more than once in file system.
+
+For each requirment, I write a function for check that situation. The basic idea for check these things is to for loop the directory inode. The structure for file system is: 
+
+```boot block | superblock | log | inode blocks | free bitmap | data block```
+
+The inode contains a address array which point to data blocks. The first 12 addresses directly point to data block and the last address is indirectly to data block. The last address is to a data block which contains addresses. In this way the inodes could manage more data in a file.
+
+The fschecker.c contains all the consistancy check part. to run this part, go to linux/ 
+
+ ```
+ make
+ ./fscheck fs.img
+ ```  
+
+### File System Integrity
+
+In this part, I changed the existing xv6 file system to add protection from data corruption. I did the following three things.
+
+1. Modify the code to allow the user to create a new type of file that keeps a checksum for every block it points to. Checksums are used by modern storage systems in order to detect silent corruption.
+2. Change the file system to handle reads and writes differently for files with checksums. Specifically, when writing out such a file, I create a checksum for every block of the file; when reading such a file, I check and make sure the block still matches the stored checksum, returning an error code (-1) if it doesn't. In this way, this file system is able to detect corruption.
+3. For information purposes, I also modify the stat() system call to dump some information about the file. Thus, I write a little program that, given a file name, not only prints out the file's size, etc., but also some information about the file's checksums.
+
+##### Implementation
+
+Basically, calculate the checksum by using XOR operation for each byte of data and maintain a one byte checksum. The address in inodes are modified using first one byte to represent the checksum and last three byte to represent the real address. Every time create a new file, check which type of file need to create. Each time calling writei() for inode, calculate the checksum and update it into address. Every time readi(), first calculate checksum and compare it with the checksum saved in address first byte. If match, keep reading. If not, return -1 to stop reading. In order to return checksum when the file type is T_CHECKED, modify the stati() in fs.c to calculate the checksum for the whole file. Finally, I write a filestat.c 
+
+The file I modified constains: fs.c, fs.h. I write a test file in 
+
+To run this part,
+
+```
+make qemu
+testfsintegrity filename
+filestat filename
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
