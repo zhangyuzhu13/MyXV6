@@ -59,6 +59,9 @@ struct proc {
   void* share[NSHAREDPG]; //share memory page
   int isthread;
   void* ustack;
+  int priority;
+  int pri1_rtm;
+  int pri2_rtm;
 };
 
 // Process memory is laid out contiguously, low addresses first:

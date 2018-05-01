@@ -6,8 +6,8 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
-#include "procinfo.h"
-struct {
+#include "pstat.h"
+struct{
   struct spinlock lock;
   struct proc proc[NPROC];
 } ptable;
@@ -26,22 +26,19 @@ static void wakeup1(void *chan);
 
 //new fecture: get all processes info
 int
-getprocsinfo(struct procinfo* info)
+getpinfo(struct pstat* info)
 {
   struct proc *p;
-  struct procinfo *in;
-  in = info; 
   int count = 0;
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
   {
-    if (p->state == EMBRYO || p->state == RUNNABLE || p->state == RUNNING || p->state == SLEEPING)
-	{
-	  in->pid = p->pid;
-	  safestrcpy(in->pname, p->name,16);
-	  count++;
-	  in++;
-	}
+    if (p->state == RUNNING || p->state == RUNNABLE || p->state == SLEEPING){
+      info->pid[count] = p->pid;
+      info->lticks[count] = p->pri1_rtm;
+      info->hticks[count] = p->pri2_rtm;
+      count++;	
+    }
   }
   release(&ptable.lock);
   return count;
@@ -103,7 +100,6 @@ allocproc(void)
 {
   struct proc *p;
   char *sp;
-
   acquire(&ptable.lock);
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
@@ -116,8 +112,13 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  // initial as priority 1
+  p->priority = 1;
   // initial as not a thread
   p->isthread = 0;
+  // initial as start time
+  p->pri1_rtm = 0;
+  p->pri2_rtm = 0;
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -485,6 +486,19 @@ wait(void)
   }
 }
 
+int 
+setpri(int priority)
+{
+  if(priority < 1 || priority > 2) {
+    return -1;
+  }
+  struct proc *curproc = myproc();
+  acquire(&ptable.lock);
+  curproc->priority = priority;
+  release(&ptable.lock);
+  return 0;
+}
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -499,30 +513,46 @@ scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
-  
   for(;;){
     // Enable interrupts on this processor.
     sti();
+    int max_priority = 1;
 
-    // Loop over process table looking for process to run.
+    // Loop over process table looking for the highest priority.
     acquire(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE || p->priority <= max_priority)
+        continue;
+      if(p->priority > max_priority && p->priority == 2){
+        max_priority = p->priority;
+        break;
+      }
+    }
+    // Loop over process table looking for process to run.
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
-
+      
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
+      if(p->priority == max_priority){
+      	c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
 
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
+        
+        
+        // Process is done running for now.
+        // update the max_priority in case the priority of this process changed 
+        if(p->state != ZOMBIE && p->priority > max_priority){
+          max_priority = p->priority;
+        }
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+      }
     }
     release(&ptable.lock);
 
@@ -706,3 +736,20 @@ procdump(void)
     cprintf("\n");
   }
 }
+// update the process running time tick, called in trap.c every tick.
+void
+updatertm()
+{
+  struct proc *p;
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state == RUNNING){
+      if(p->priority == 1)
+        p->pri1_rtm++;
+      else if(p->priority == 2)
+        p->pri2_rtm++;
+    } 
+  }
+  release(&ptable.lock);
+}
+

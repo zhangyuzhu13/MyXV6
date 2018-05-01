@@ -152,6 +152,9 @@ _forktest: forktest.o $(ULIB)
 mkfs: mkfs.c fs.h
 	gcc -Werror -Wall -o mkfs mkfs.c
 
+fschecker: fschecker.c fs.h 
+	gcc fschecker.c -o fschecker
+
 # Prevent deletion of intermediate files, e.g. cat.o, after first build, so
 # that disk image changes after first build are persistent until clean.  More
 # details:
@@ -167,19 +170,23 @@ UPROGS=\
 	_kill\
 	_ln\
 	_ls\
+        _ps\
 	_mkdir\
 	_rm\
 	_sh\
 	_stressfs\
 	_usertests\
-	_testgetprocsinfo\
+	_testscheduler\
  	_testmemory\
         _testkthreads\
+        _testfsintegrity\
 	_wc\
 	_zombie\
+        _filestat
 
 fs.img: mkfs $(UPROGS)
 	./mkfs fs.img $(UPROGS)
+
 
 -include *.d
 
@@ -213,7 +220,7 @@ QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
 	then echo "-gdb tcp::$(GDBPORT)"; \
 	else echo "-s -p $(GDBPORT)"; fi)
 ifndef CPUS
-CPUS := 4
+CPUS := 1
 endif
 QEMUOPTS = -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512  $(QEMUEXTRA)
 
@@ -245,8 +252,8 @@ qemu-nox-gdb: fs.img xv6.img .gdbinit
 
 EXTRA=\
 	mkfs.c ulib.c user.h cat.c echo.c forktest.c grep.c kill.c\
-	ln.c ls.c mkdir.c rm.c stressfs.c testmemory.c testgetprocsinfo.c usertests.c wc.c zombie.c\
-	printf.c umalloc.c testkthreads.c\
+	ln.c ls.c ps.c mkdir.c rm.c stressfs.c testmemory.c testscheduler.c testintegrity.c usertests.c wc.c zombie.c\
+	printf.c umalloc.c testkthreads.c filestat.c\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
 	.gdbinit.tmpl gdbutil\
 

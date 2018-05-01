@@ -6,7 +6,7 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
-#include "procinfo.h"
+#include "pstat.h"
 int
 sys_fork(void)
 {
@@ -14,12 +14,12 @@ sys_fork(void)
 }
 
 int
-sys_getprocsinfo(void)
+sys_getpinfo(void)
 {
-  struct procinfo *info;
-  if(argptr(0, (void*)&info, NPROC*sizeof(*info)) < 0)
+  struct pstat *info;
+  if(argptr(0, (void*)&info, sizeof(info)) < 0)
     return -1;
-  return getprocsinfo(info);
+  return getpinfo(info);
 }
 
 int
@@ -138,4 +138,13 @@ sys_join(void)
     return -1;
   }
   return join(pid);
+}
+int
+sys_setpri(void) 
+{
+  int priority;
+  if(argint(0, &priority) < 0){
+    return -1;
+  }
+  return setpri(priority);
 }

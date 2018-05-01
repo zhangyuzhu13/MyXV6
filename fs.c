@@ -379,6 +379,9 @@ bmap(struct inode *ip, uint bn)
   if(bn < NDIRECT){
     if((addr = ip->addrs[bn]) == 0)
       ip->addrs[bn] = addr = balloc(ip->dev);
+    // if it's checksum-based file, only last 3 byte is the address
+    if(ip->type == T_CHECKED)
+      addr = 0x00ffffff & addr;
     return addr;
   }
   bn -= NDIRECT;
@@ -394,6 +397,9 @@ bmap(struct inode *ip, uint bn)
       log_write(bp);
     }
     brelse(bp);
+    // return only last 3 byte address if it's checksum-based file
+    if(ip->type == T_CHECKED)
+      addr = 0x00ffffff & addr;
     return addr;
   }
 
@@ -445,8 +451,47 @@ stati(struct inode *ip, struct stat *st)
   st->type = ip->type;
   st->nlink = ip->nlink;
   st->size = ip->size;
+  // calculate the checksum if file type is checksum-based file
+  if(ip->type == T_CHECKED){
+    uint checksum = 0;
+    for(int i = 0; i < NDIRECT; i++){
+      checksum ^= (ip->addrs[i] >> 24) & 0xff;
+    }// sum the indirect part up
+    if(ip->addrs[NDIRECT] != 0){
+      struct buf* bp = bread(ip->dev, ip->addrs[NDIRECT]);
+      uint *addr = (uint*)bp->data;
+      for(int i = 0; i < NINDIRECT; i++){
+        checksum ^= ((*addr) >> 24) & 0xff;
+        addr++;
+      } 
+      brelse(bp);
+    }
+    st->checksum = (uchar)checksum;
+  }
+ 
+  
 }
-
+// build a new checksum when writing data into block.
+uint createcksm(char* data){
+  uint checksum = 0;
+  for(uint i = 0; i < BSIZE; i++){
+    checksum = checksum ^ (uint)*data;
+    data++;
+  }
+  return checksum;
+}
+// check if checksum is the same with old one when read block data.
+int checkcksm(char* data, uint addr){
+  uint currcksm = createcksm(data);
+  uint oldcksm = (addr >> 24);
+  cprintf("addr is %d\n", addr);
+  if(currcksm == oldcksm)
+    return 1;
+  else {
+    cprintf("old: %d, new: %d\n", oldcksm, currcksm);
+    return -1;
+  }
+}
 //PAGEBREAK!
 // Read data from inode.
 // Caller must hold ip->lock.
@@ -468,8 +513,39 @@ readi(struct inode *ip, char *dst, uint off, uint n)
     n = ip->size - off;
 
   for(tot=0; tot<n; tot+=m, off+=m, dst+=m){
-    bp = bread(ip->dev, bmap(ip, off/BSIZE));
+    uint block = bmap(ip, off/BSIZE);
+    bp = bread(ip->dev, block);
     m = min(n - tot, BSIZE - off%BSIZE);
+    
+    //check the checksum if the file type is checksum-based file
+    if(ip->type == T_CHECKED){
+      int isfind = 0;
+      uint addr = 0;
+      for(int i = 0; i < NDIRECT; i++){
+        
+        // get the address in th direct part
+        if((ip->addrs[i] & 0x00ffffff)== block){
+          isfind = 1;
+          addr = ip->addrs[i];
+cprintf("%d, %d", ip->addrs[i], block);
+          break;
+        }
+      }
+      
+      if(isfind == 0 && ip->addrs[NDIRECT] != 0){ // check the indirect part
+        struct buf *b = bread(ip->dev, ip->addrs[NDIRECT]);
+        uint *ptr = (uint*)b->data;
+        for(int i = 0; i < NINDIRECT; i++){
+          if(((*ptr) & 0x00ffffff) == block){
+             addr = *ptr;
+          }
+        }
+        brelse(b); 
+      }
+      int currcksm = checkcksm((char*)bp->data, addr);
+      if(currcksm < 0)
+        return -1;
+    }
     memmove(dst, bp->data + off%BSIZE, m);
     brelse(bp);
   }
@@ -497,10 +573,42 @@ writei(struct inode *ip, char *src, uint off, uint n)
     return -1;
 
   for(tot=0; tot<n; tot+=m, off+=m, src+=m){
-    bp = bread(ip->dev, bmap(ip, off/BSIZE));
+    // get the block number for writing data into it.
+    uint block = bmap(ip, off/BSIZE); 
+    bp = bread(ip->dev, block);
     m = min(n - tot, BSIZE - off%BSIZE);
     memmove(bp->data + off%BSIZE, src, m);
+    // check file type if its checksum-based file, create checksum and add it into address pointer
+    if(ip->type == T_CHECKED){    
+      uint checksum = createcksm((char*)bp->data);
+      int blockindex = -1;
+      // check direct pointer first
+      for(int i = 0; i < NDIRECT; i++){
+        cprintf("curr block is %d\n", ip->addrs[i]);
+        if((ip->addrs[i] & 0x00ffffff) == block){
+          blockindex = i;
+          break;
+        }  
+      }// the block is in a direct pointer
+      if(blockindex > -1){
+        ip->addrs[blockindex] = block + (checksum << 24);
+        cprintf("addrs in write is %d\n", ip->addrs[blockindex]);
+      } else { // check the indirect part
+        struct buf* b = bread(ip->dev, ip->addrs[NDIRECT]);
+        uint * ptr = (uint*)b->data;
+        for(int i = 0; i < NINDIRECT; i++){
+          if(((*ptr) & 0x00ffffff) == block){
+            *ptr = block + (checksum << 24);
+            break;
+          }
+          ptr++;
+        }
+        bwrite(b);
+        brelse(b);
+      }
+    }
     log_write(bp);
+    bwrite(bp);
     brelse(bp);
   }
 

@@ -104,11 +104,12 @@ extern int sys_unlink(void);
 extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
-extern int sys_getprocsinfo(void);
+extern int sys_getpinfo(void);
 extern int sys_shmem_access(void);
 extern int sys_shmem_count(void);
 extern int sys_clone(void);
 extern int sys_join(void);
+extern int sys_setpri(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -132,11 +133,12 @@ static int (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
-[SYS_getprocsinfo] sys_getprocsinfo,
+[SYS_getpinfo] sys_getpinfo,
 [SYS_shmem_access] sys_shmem_access,
 [SYS_shmem_count] sys_shmem_count,
 [SYS_clone]    sys_clone,
 [SYS_join]     sys_join,
+[SYS_setpri]   sys_setpri,
 };
 
 void
